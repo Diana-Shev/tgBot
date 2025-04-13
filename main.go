@@ -223,10 +223,12 @@ func main() {
 					}
 				}
 				sess.SelectedTopics = append(sess.SelectedTopics, index)
-				if len(sess.SelectedTopics) < 3 {
+				if len(sess.SelectedTopics) <= 3 {
 					topic := sess.Topics[index]
 					bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("✅ Тема добавлена: %s (%d из 3)", topic, len(sess.SelectedTopics))))
-					continue
+					if len(sess.SelectedTopics) <= 2 {
+						continue
+					}
 				}
 
 				rows := [][]tgbotapi.InlineKeyboardButton{}
