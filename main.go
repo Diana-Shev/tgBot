@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
@@ -127,7 +128,7 @@ func main() {
 				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "⏳ Генерирую темы, подожди секунду...")
 				bot.Send(msg)
 
-				topicsText, err := askYandexGPT("Сгенерируй 10 интересных, разнообразных тем для историй. Ответ выдай в виде пронумерованного списка из 2 или 3 слов.", 300)
+				topicsText, err := askYandexGPT("Сгенерируй 10 интересных, разнообразных тем для историй,  основанных на реальных фактах. Ответ выдай в виде пронумерованного списка из 2 или 3 слов.", 300)
 				if err != nil {
 					bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "❌ Ошибка генерации тем: "+err.Error()))
 					continue
@@ -175,7 +176,7 @@ func main() {
 			bot.Request(ack)
 
 			if data == "restart" {
-				topicsText, err := askYandexGPT("Сгенерируй 10 интересных, разнообразных тем для историй. Ответ выдай в виде пронумерованного списка из 2 или 3 слов.", 300)
+				topicsText, err := askYandexGPT("Сгенерируй 10 интересных, разнообразных тем для историй, основанных на реальных фактах. Ответ выдай в виде пронумерованного списка из 2 или 3 слов.", 300)
 				if err != nil {
 					bot.Send(tgbotapi.NewMessage(chatID, "❌ Ошибка генерации тем: "+err.Error()))
 					continue
@@ -251,11 +252,28 @@ func main() {
 				sess := sessions[chatID]
 				sess.ChosenIndex = index
 				topic := sess.Topics[index]
+
 				storyPrompt := fmt.Sprintf("Придумай интересную, подробную историю на тему: %s. Не превышай 10000 токенов.", topic)
 				story, err := askYandexGPT(storyPrompt, 800)
 				if err != nil {
 					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка генерации истории: "+err.Error()))
 					continue
+				}
+
+				// Сохраняем в базу данных
+				username := callback.From.UserName
+				_, dbErr := DB.Exec(`
+				INSERT INTO requests (username, timestamp, user_text, gpt_response, status)
+				VALUES (?, ?, ?, ?, ?)
+				`, username,
+					time.Now().Format("2006-01-02 15:04:05"),
+					topic,
+					story,
+					"успех",
+				)
+
+				if dbErr != nil {
+					log.Println("❌ Ошибка сохранения в БД:", dbErr)
 				}
 				bot.Send(tgbotapi.NewMessage(chatID, "📚 История по теме \""+topic+"\":\n\n"+story))
 				continue
